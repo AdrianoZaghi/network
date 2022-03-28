@@ -7,3 +7,5 @@ abundance.csv
 *cov_mat_SparCC.out
 #ignore metadata
 metadata.csv
+#pycache
+__pycache__
