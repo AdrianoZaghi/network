@@ -1,0 +1,9 @@
+#ignore abundance data, those are too big
+abundance.csv
+#ignore utility file for sparcc
+*sparcc_utility.tsv
+*sparcc_utility_cor_matrix.tsv
+*sparcc.out
+*cov_mat_SparCC.out
+#ignore metadata
+metadata.csv
