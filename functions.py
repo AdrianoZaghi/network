@@ -144,7 +144,7 @@ def make_graph(datab):
 	It is obtained using as adjacency matrix the method c_matrix of the datab object in argument
 	"""
 	if len(datab.c_matrix) == 0:
-		datab.get_skbio_matrix()
+		datab.get_pearson_matrix()
 	return nx.from_numpy_array(datab.c_matrix)
 
 #	make_graph(A)
