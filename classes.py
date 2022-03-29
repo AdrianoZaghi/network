@@ -53,7 +53,9 @@ class datab:
 					self.samples[name] = sample(name, occ, met)
 
 	def __lshift__(self, list_of_2_dict_and_the_name):	#	<< operator
-		self.samples, self.description, self.filename = list_of_2_dict_and_the_name
+		self.samples = list_of_2_dict_and_the_name[0]
+		self.description = list_of_2_dict_and_the_name[1]
+		self.filename = list_of_2_dict_and_the_name[2]
 
 	def encert_square(self):
 		first_sample_len = len(list(self.samples.values())[0].occurrence)
@@ -71,9 +73,9 @@ class datab:
 		"""Print on the terminal some usefull informations about the database"""
 		print(self.description)
 		print("ci sono ", len(self.samples), " campioni")
-		print("elenco i campioni con annessa quantità di entrate")
+		print("elenco i campioni con annessa somma delle occorrene")
 		for s in self.samples:
-			print(s, "      ", len(self.samples[s].occurrence))
+			print(s, "      ", sum(self.samples[s].occurrence.values()))
 			
 	def print_tsv_for_sparcc(self, file_name):
 		with open(file_name, mode = 'w', encoding="utf-8") as tab:
@@ -104,7 +106,7 @@ class datab:
 		name = self.filename + "_sparcc_utility.tsv"
 		self.print_tsv_for_sparcc(name)
 		os.system("python3 ../SparCC3/SparCC.py " + name + " -i " + str(iterations) + " --cor_file=" + name.split('.')[0] + "_cor_matrix.tsv")
-		self.c_matrix = pd.read_csv(name.split('.')[0] + "_cor_matrix.tsv", sep='\t')
+		self.c_matrix = pd.read_csv(name.split('.')[0] + "_cor_matrix.tsv", sep='\t', index_col=0).to_numpy()
 		return self.c_matrix
 		
 	def get_pearson_matrix(self):
@@ -129,5 +131,12 @@ class datab:
 		self.c_matrix = np.corrcoef(np.array(stupid), rowvar = False)
 		return self.c_matrix
 		
-	
-#	A = datab("abundance.csv","config.json","metadata.csv")
+#	run classes.py
+#	run functions.py
+#	A = datab("abundance.csv", "metadata.csv")
+#	A_fil = filtering_mediana(filtering_prevalenza(A, 20), 5)
+#	A_L1 = normalize(A_fil, L_1, "L1")
+#	graf_L1 = edge_filtering(make_graph(A_L1.get_pearson_matrix()), 0.2)
+#	A_CLR = normalize(A_fil, CLR, "Center Log Rateo")
+#	graf_CLR = edge_filtering(make_graph(A_CLR.get_pearson_matrix()), 0.2)
+#	graf_sparcc = edge_filtering(make_graph(A_fil.get_sparcc_matrix(20)), 0.2)

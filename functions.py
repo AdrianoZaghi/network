@@ -87,7 +87,7 @@ def filtering_mediana(data, mediana):
 		new_occurrence = dict((k, data.samples[s].occurrence[k]) for k in new_labels)
 		new_sample = sample(s, new_occurrence, data.samples[s].metadata)
 		new_samples[s] = new_sample
-	new_description = data.description
+	new_description = data.description.copy()
 	new_description["Filtering procedure"] += ("Filtering for mediana equal " + str(mediana))
 	new_data = datab()
 	new_data << [new_samples, new_description, data.filename]
@@ -96,7 +96,7 @@ def filtering_mediana(data, mediana):
 #	med = filtering_mediana(A, 3)
 #	filtrato = filtering_prevalenza(filtering_mediana(A, 5), 20)
 
-def normalize(datab, norm, normalization_name):
+def normalize(data, norm, normalization_name):
 	"""This function normalize each sample of the datab with a given norm
 		datab 	 	datab object 	 	 	the database to be normalized
 		norm 	 	function name 	 	 	the function that will be used to normalize each sample
@@ -104,18 +104,19 @@ def normalize(datab, norm, normalization_name):
 	If the database is already normalized, it's not modified and is returned as it is
 	If not, is returned a new normalized database, without modifaing the existing one
 	"""
-	if datab.description["Normalization"] == "nessuna":
+	if data.description["Normalization"] == "nothing":
 		new_samples = {}
-		for s in datab.samples:
-			new_samples[s] = sample(s, norm(datab.samples[s].occurrence), datab.samples[s].metadata)
+		for s in data.samples:
+			new_samples[s] = sample(s, norm(data.samples[s].occurrence), data.samples[s].metadata)
 			new_samples[s].metadata["Normalization"] = normalization_name
-		new_datab = datab()
-		new_datab << [new_samples, datab.description, datab.filename]
-		new_datab.description["Normalization"] = normalization_name
-		return new_datab
+		new_description = data.description.copy()
+		new_description["Normalization"] = normalization_name
+		new_data = datab()
+		new_data << [new_samples, new_description, data.filename]
+		return new_data
 	else:
 		print("Database già normalizzato")
-		return datab
+		return data
 
 #NORME
 
@@ -123,29 +124,36 @@ def L_1(s):
 	"""A function that can be used to normalize sample occurrence with L1 norm
 	"""
 	new_occurrence = {}
-	n = sum(s.occurrence.values())
-	for o in s.occurrence:
-		new_occurrence[o] = s.occurrence[o] / n
+	n = sum(s.values())
+	for o in s:
+		new_occurrence[o] = s[o] / n
 	return new_occurrence
 
 def CLR(s):
 	"""A function that can be used to normalize sample occurrence with Center Log Rateo norm
 	"""
 	new_occurrence = {}
-	G = pow(numpy.prod(s.occurrence.values()), 1/len(s.occurrence))
-	for o in s.occurrence:
-		new_occurrence[o] = math.log(s.occurrence[o] / G)
+	P = 1
+	for val in s:
+		if s[val] > 0:
+			P *= pow(s[val], 1/len(s))
+	for o in s:
+		if s[o] > 0:
+			new_occurrence[o] = math.log(s[o] / P)
+		else:
+			new_occurrence[o] = 0
 	return new_occurrence
 
 # normato = normalize(A, L_1, "L_1")
 	
-def make_graph(datab):
+def make_graph(c_matrix):
 	"""Return a NetworkX object that represents a graph.
 	It is obtained using as adjacency matrix the method c_matrix of the datab object in argument
 	"""
-	if len(datab.c_matrix) == 0:
-		datab.get_pearson_matrix()
-	return nx.from_numpy_array(datab.c_matrix)
+	if len(c_matrix) == 0:
+		print("La matrice è vuota")
+		return
+	return nx.from_numpy_array(c_matrix)
 
 #	make_graph(A)
 
@@ -153,9 +161,9 @@ def edge_filtering(grap, density):
 	"""From the NetworkX graph object in input, are removed the less hevi edges,
 	untill the density sepcified is reached
 	"""
+	grap.remove_edges_from(nx.selfloop_edges(grap))
 	sorted_by_weight = sorted(grap.edges(data="weight"), key=lambda tup: tup[2])
 	while nx.density(grap) > density:
 		grap.remove_edge(sorted_by_weight[0][0], sorted_by_weight[0][1])
-		print(sorted_by_weight, nx.density(grap))
 		del sorted_by_weight[0]
 	return grap
