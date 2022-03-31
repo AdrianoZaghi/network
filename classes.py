@@ -1,142 +1,71 @@
-import csv
 import os
 import pandas as pd
 import numpy as np
-
-class sample:
-	"""Class used to collect sample informations:
-			name 	 	string 	 	 	should be the name of the sample
-			occurrence 	dicctionary 	should collect the occurrency of all the different kind of OTU (or other classification), labeled with their name
-			metadata 	dictionary 	 	should collect the additional informations about the sample contained in the metadata file
-	"""
-	def __init__(self, name, occurrence, metadata):
-		self.name = name
-		self.occurrence = occurrence.copy()
-		self.metadata = metadata.copy()
+import networkx as nx
 
 class datab:
-	"""Class used as a container of multiple samples, should represent the database used
-			samples 	 	dictionary 	 should contain all the samples, labeled with their name
-			description 	dictionary 	 contains various fields that are modified when the database is manipulated. Keeps track of all the poerations made on it
-				"Classification level" 	: 	The occurrence are expressed intherms of OTU, phyum, genus, ....
-				"Filtering procedure" 	: 	What are the chriterion used to filter the OTUs (or other level) before performing any operation
-				"Normalization" 	 	: 	What mathod is uded to normalize the database ebtries
-				"Square" 	 	 	 	: 	True if all the samples have the same se of labels
-			c_matrix 	 	 2D ndarray  contains the value of correlation between the various kind of bacteria that are evaluted from all the database
-			filename 	 	 string 	 keep track of the filename the occurrencies are taken from"""
-	def __init__(self, file_name = None, metadata_file_name = None):
-		"""__init__() 	 	 it can recive 2 arguments or none:
-			file_name 	 	 	 should be a csv file with the occurrence of different OTUs
-			metadata_file_name   should be a csv file conitaining all other infos about the samples"""
-		self.c_matrix = []
-		self.samples = {}
+	def __init__(self, file_name = None):
+		self.c_matrix = None
+		self.graph = None
 		if file_name == None:
 			self.description = {}
 			self.filename = ""
+			self.samples = None
 		else:
+			self.samples = pd.read_csv(file_name, index_col=0)
 			self.filename = file_name.split('.')[0]
 			self.description = {"Classification level":"otu", "Filtering procedure" : "", "Normalization": "nothing", "Square?" : False}
-			with open(file_name, encoding= "utf-8", mode = "r") as d, open(metadata_file_name, encoding="utf-8", mode ="r") as e:
-				csv_dati = csv.DictReader(d)
-				csv_metadati = csv.DictReader(e)
-				for righe in csv_dati:
-					occ = righe
-					name = occ.pop("")
-					for elem in occ:
-						occ[elem] = int(occ[elem])
-					for righe in csv_metadati:
-						if righe[""] == name:
-							met = righe
-							break
-					del met[""]
-					met["Classification level"] = "otu"
-					self.samples[name] = sample(name, occ, met)
-
-	def __lshift__(self, list_of_2_dict_and_the_name):	#	<< operator
-		self.samples = list_of_2_dict_and_the_name[0]
-		self.description = list_of_2_dict_and_the_name[1]
-		self.filename = list_of_2_dict_and_the_name[2]
-
-	def encert_square(self):
-		first_sample_len = len(list(self.samples.values())[0].occurrence)
-		r = all(len(self.samples[s].occurrence) == first_sample_len for s in self.samples)
-		self.description["Square?"] = r
-		return r
-
-	def get_label_population(self):
-		labels = []
-		for s in self.samples:
-	 		labels = labels + list(self.samples[s].occurrence.keys())
-		return labels
+	
+	def __lshift__(self, dataframe_description_filename):	#	<< operator
+		self.samples = dataframe_description_filename[0]
+		self.description = dataframe_description_filename[1]
+		self.filename = dataframe_description_filename[2]
 	
 	def get_info(self):
 		"""Print on the terminal some usefull informations about the database"""
+		print(self.samples.info())
 		print(self.description)
-		print("ci sono ", len(self.samples), " campioni")
-		print("elenco i campioni con annessa somma delle occorrene")
-		for s in self.samples:
-			print(s, "      ", sum(self.samples[s].occurrence.values()))
-			
-	def print_tsv_for_sparcc(self, file_name):
-		with open(file_name, mode = 'w', encoding="utf-8") as tab:
-			print("", end='', file = tab)
-			label_list = list(list(self.samples.values())[0].occurrence.keys())
-			for s in self.samples:
-				print("\t\""+s+"\"", end='', file = tab)
-			print("", file = tab)
-			for l in label_list:
-				print("\""+l+"\"", end='', file = tab)
-				for s in self.samples:
-					print("\t", self.samples[s].occurrence[l], end='', file=tab)
-				print("", file= tab)
+		
+	def filter_median(self, m):
+		not_keep = dict(self.samples.median() < m)
+		k = [lab for lab in not_keep if not_keep[lab]]
+		self.samples = self.samples.drop(k, axis = "columns")
+		
+	def filter_prevalence(self, p):
+		limit = (1-p)*self.samples.shape[0]
+		not_keep = [l for l in self.samples if list(self.samples[l]).count(0) > limit]
+		self.samples = self.samples.drop(not_keep, axis = "columns")
 	
 	def get_sparcc_matrix(self, iterations):
-		"""If the data haven't be normalized anyhouw and is square, this function initialize the method c_matrix with the correlation values obtained from sparcc algorithm
-		Moreover it retruns this matrix
-		The argument is the number of iterations that the algorithm is going to perform
-		If the conditions are not observed, the function prints an error message and retuns nothing without initializing enithing
-		"""
-		self.encert_square()
-		if self.description["Square?"] == False:
-			print("Occorrenze non quadrate")
-			return
 		if self.description["Normalization"] != "nothing":
 			print("Per questo metodo, i dati non devono essere normalizzati")
 			return
 		name = self.filename + "_sparcc_utility.tsv"
-		self.print_tsv_for_sparcc(name)
-		os.system("python3 ../SparCC3/SparCC.py " + name + " -i " + str(iterations) + " --cor_file=" + name.split('.')[0] + "_cor_matrix.tsv")
-		self.c_matrix = pd.read_csv(name.split('.')[0] + "_cor_matrix.tsv", sep='\t', index_col=0).to_numpy()
+		with open(name, mode = 'w', encoding="utf-8") as tab:
+			self.samples.T.to_csv(tab, sep = '\t')
+		os.system("python3 ../SparCC3/SparCC.py " + name + " -i " + str(iterations) + " --cor_file=" + name.split("_utility")[0] + "_cor_matrix.tsv")
+		self.c_matrix = pd.read_csv(name.split("_utility")[0] + "_cor_matrix.tsv", sep='\t', index_col=0).to_numpy()
 		return self.c_matrix
 		
-	def get_pearson_matrix(self):
-		"""This function evluate the c_matrix with pearson correlation and retunrs it.
-		The data have to be squared, otherwise it prints an error message and don't do anything else
-		Before doing the caluclation, it prints out the way in which the databade have been normalized
-			The data should always be normalized before evaluating pearson correlation
-		"""
-		self.encert_square()
-		if self.description["Square?"] == False:
-			print("Occorrenze non quadrate")
-			return
-		print("The dataset has been previously normalized with " + self.description["Normalization"])
-		label_list = list(set(self.get_label_population()))
-		sample_ids = list(self.samples.keys())
-		stupid = []
-		for s in sample_ids:
-			List = []
-			for o in label_list:
-				List.append(self.samples[s].occurrence[o])
-			stupid.append(List)
-		self.c_matrix = np.corrcoef(np.array(stupid), rowvar = False)
+	def get_pearson_matrix(self, mode = "L1"):
+		if mode == "L1":
+			norm = self.samples.sum(axis = 1)
+			self.samples.div(norm, axis = 0)
+		elif mode == "CLR":
+			temporary = self.samples.replace(0, np.nan)
+			G = pow(temporary.product(axis = 1, skipna = True), 1/len(self.sampls.shape[1]))
+			self.samples = np.log(self.samples.div(G, axis = 0))
+		else:
+			print("normalization mode not implemented")
+			return 0
+		self.description["Normalization"] = mode
+		self.c_matrix = np.corrcoef(np.array(self.samples), rowvar = False)
 		return self.c_matrix
-		
-#	run classes.py
-#	run functions.py
-#	A = datab("abundance.csv", "metadata.csv")
-#	A_fil = filtering_mediana(filtering_prevalenza(A, 20), 5)
-#	A_L1 = normalize(A_fil, L_1, "L1")
-#	graf_L1 = edge_filtering(make_graph(A_L1.get_pearson_matrix()), 0.2)
-#	A_CLR = normalize(A_fil, CLR, "Center Log Rateo")
-#	graf_CLR = edge_filtering(make_graph(A_CLR.get_pearson_matrix()), 0.2)
-#	graf_sparcc = edge_filtering(make_graph(A_fil.get_sparcc_matrix(20)), 0.2)
+	
+	def make_graph(self, density):
+		self.graph = nx.from_numpy_array(self.c_matrix)
+		self.graph.remove_edges_from(nx.selfloop_edges(self.graph))
+		sorted_by_weight = sorted(abs(self.graph.edges(data="weight")), key = lambda tup: abs(tup[2]))
+		while nx.density(self.graph) > density:
+			self.graph.remove_edge(sorted_by_weight[0][0], sorted_by_weight[0][1])
+			del sorted_by_weight[0]
