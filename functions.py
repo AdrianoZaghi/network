@@ -1,5 +1,7 @@
 from classes import datab
 import pandas as pd
+import networkx as nx
+import matplotlib.pyplot as plt
 
 
 def grow_tax_level(in_datab, out_level, taxonomy_file):
@@ -31,3 +33,38 @@ def grow_tax_level(in_datab, out_level, taxonomy_file):
 		New = datab()	
 		New.init_form_panda(pd.concat(lil, axis = 1), in_datab.description, in_datab.filename)
 		return New
+	
+	
+def Node_beet_centrality(data):	
+	dik = nx.betweenness_centrality(data.graph)
+	sort = sorted(list(dik), key = lambda d : dik[d])
+	v = [dik[lab] for lab in sort]
+	plt.figure(figsize=(9, 3))
+	plt.subplot()
+	plt.bar(sort, v)
+	return [sort,v]
+
+def Node_degree(data):
+	dik = dict(data.graph.degree())
+	sort = sorted(list(dik), key = lambda d : dik[d])
+	v = [dik[lab] for lab in sort]
+	plt.figure(figsize=(9, 3))
+	plt.subplot()
+	plt.bar(sort, v)
+	return [sort,v]
+
+def Edge_beet_centrality(data):
+	dik = nx.edge_betweenness_centrality(data.graph)
+	sort = sorted(list(dik), key = lambda d : dik[d])
+	l = [str(lab[0]) + str(lab[1]) for lab in sort]
+	v = [dik[lab] for lab in sort]
+	plt.figure(figsize=(9, 3))
+	plt.subplot()
+	plt.bar(l, v)
+	return [l,v]
+
+def Jaccard_index_edges(data_1, data_2):
+	inter = list(set(data_1.graph.edges()) & set(data_2.graph.edges()))
+	nume = sum([min([data_1.graph.edges()[val]["weight"], data_2.graph.edges()[val]["weight"]]) for val in inter])
+	deno = sum([data_1.graph.edges()[val]["weight"] for val in data_1.graph.edges()] + [data_2.graph.edges()[val]["weight"] for val in data_2.graph.edges()]) - nume
+	return nume/deno

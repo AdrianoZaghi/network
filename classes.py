@@ -14,7 +14,7 @@ class datab:
 			"Normalization" 	 	 	How the databas have been normalized
 			"Correlation" 	 	 	 	How the correlation matrix have been obrained
 			"Graf filtering procedure" 	How the graph have been filtered
-		c_matrix 	 	 	 	 	 A ndarray, containing the correlation matrix evaluated from the data
+		c_matrix 	 	 	 	 	 A pandas matrix, containing the correlation matrix evaluated from the data
 		graph 	 	 	 	 	 	 A networkx graph that is constructed from the correlation matrix
 	"""
 	def __init__(self, file_name = None):
@@ -45,9 +45,20 @@ class datab:
 	def get_info(self):
 		"""Print on the terminal some usefull informations about the database
 		"""
+		graph_info = {}
+		print("Samples informations")
 		print(self.samples.info())
+		print("Pipline history")
 		print(self.description)
-		
+		if self.graph == None:
+			print("Grafico non ancora costruito")
+		else:
+			print("Returno le seguenti informazioni sul network")
+			print("Nodes info : {names : betweenness centrality}")
+			graph_info["Nodes"] = nx.beetweennes_centrality(self.graph)
+			graph_info["Edges"] = nx.edge_betweenness_centrality(self.graph)
+		return graph_info
+				
 	def filter_median(self, m):
 		"""Remove all the database columns which have a median value under the value of the argument m
 		"""
@@ -76,7 +87,7 @@ class datab:
 		with open(name, mode = 'w', encoding="utf-8") as tab:
 			self.samples.T.to_csv(tab, sep = '\t')
 		os.system("python3 ../SparCC3/SparCC.py " + name + " -i " + str(iterations) + " --cor_file=" + name.split("_utility")[0] + "_cor_matrix.tsv")
-		self.c_matrix = pd.read_csv(name.split("_utility")[0] + "_cor_matrix.tsv", sep='\t', index_col=0).to_numpy()
+		self.c_matrix = pd.read_csv(name.split("_utility")[0] + "_cor_matrix.tsv", sep='\t', index_col=0)
 		self.description["Correlation"] = "Correelation evaluated with SparCC"
 		return self.c_matrix
 		
@@ -100,7 +111,7 @@ class datab:
 			print("normalization mode not implemented")
 			return 0
 		self.description["Normalization"] = mode
-		self.c_matrix = np.corrcoef(np.array(self.samples), rowvar = False)
+		self.c_matrix = self.samples.corr(method = "pearson")
 		self.description["Correlation"] = "Correlation evalueted with Pearson"
 		return self.c_matrix
 	
@@ -110,10 +121,10 @@ class datab:
 		After the graph is created, self loops are removed
 		Then are also removed the smallest edges untill is reached the density specified in the argument
 		"""
-		self.graph = nx.from_numpy_array(self.c_matrix)
+		self.graph = nx.from_pandas_adjacency(self.c_matrix)
 		self.graph.remove_edges_from(nx.selfloop_edges(self.graph))
-		sorted_by_weight = sorted(abs(self.graph.edges(data="weight")), key = lambda tup: abs(tup[2]))
+		sorted_by_weight = sorted(list(self.graph.edges(data="weight")), key = lambda tup: abs(tup[2]))
 		while nx.density(self.graph) > density:
 			self.graph.remove_edge(sorted_by_weight[0][0], sorted_by_weight[0][1])
 			del sorted_by_weight[0]
-		self.description["Graph filtering procedure"] = "Removing self loops\nRemoving edges untill i get the density of " + str(density) + "\n"	
+		self.description["Graph filtering procedure"] = "Removing self loops\nRemoving edges untill i get the density of " + str(density) + "\n"
