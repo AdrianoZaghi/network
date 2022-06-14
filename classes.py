@@ -64,8 +64,10 @@ class datab:
 		"""
 		not_keep = dict(self.samples.median() < m)
 		k = [lab for lab in not_keep if not_keep[lab]]
+		r = self.samples[k].copy()
 		self.samples = self.samples.drop(k, axis = "columns")
 		self.description["Filtering procedure"] += "Filtered out clumn with median under " + str(m) + "\n" 
+		return r
 		
 	def filter_prevalence(self, p):
 		"""Remove all the database columns which have less the p% of non 0 values
@@ -100,11 +102,12 @@ class datab:
 		"""
 		if mode == "L1":
 			norm = self.samples.sum(axis = 1)
-			self.samples.div(norm, axis = 0)
+			self.samples = self.samples.div(norm, axis = 0)
 			self.description["Normalization"] = "Normalized with L1"
 		elif mode == "CLR":
-			temporary = self.samples.replace(0, np.nan)
-			G = pow(temporary.product(axis = 1, skipna = True), 1/len(self.sampls.shape[1]))
+	#		temporary = self.samples.replace(0, np.nan)
+			temporary = self.samples.replace(to_replace = 0, value = 0.5)
+			G = pow(temporary.product(axis = 1, skipna = True), 1/self.samples.shape[1])
 			self.samples = np.log(self.samples.div(G, axis = 0))
 			self.description["Normalization"] = "Normalized with CLR"
 		else:
